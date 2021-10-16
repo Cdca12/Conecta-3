@@ -9,8 +9,16 @@ FILAS = 6
 COLUMNAS = 7
 #FILAS = 3
 #COLUMNAS = 3
+CONECTA_FICHAS = 3
+
 JUGADOR = 0
 PC = 1
+
+FICHA_VACIA = 0
+FICHA_JUGADOR = 1
+FICHA_PC = 2
+
+LONGITUD_VENTANA = 3
 
 # Configuracion graficos
 TAMANO_CUADRADO = 100
@@ -42,11 +50,11 @@ def ponerFicha(tablero, fila, columna, ficha):
    tablero[fila][columna] = ficha
 
 def esPosicionValida(tablero, columna):
-    return tablero[FILAS - 1][columna] == 0 # Hardcode, checa última
+    return tablero[FILAS - 1][columna] == FICHA_VACIA
 
 def obtenerSiguienteFila(tablero, columna):
     for fila in range(FILAS):
-        if tablero[fila][columna] == 0:
+        if tablero[fila][columna] == FICHA_VACIA:
             return fila
 
             
@@ -92,11 +100,9 @@ def dibujarTablero(tablero):
     for columna in range(COLUMNAS):
         for fila in range(FILAS):
             pos = tablero[fila][columna]
-            if pos == 1:
-                # Fichas Jugador
+            if pos == FICHA_JUGADOR:
                 pygame.draw.circle(pantalla, COLOR_JUGADOR, (int(columna * TAMANO_CUADRADO + TAMANO_CUADRADO / 2), ALTURA_TABLERO - int(fila * TAMANO_CUADRADO + TAMANO_CUADRADO / 2)), RADIO_CIRCULO)
-            elif pos == 2:
-                # Fichas PC
+            elif pos == FICHA_PC:
                 pygame.draw.circle(pantalla, COLOR_PC, (int(columna * TAMANO_CUADRADO + TAMANO_CUADRADO / 2), ALTURA_TABLERO - int(fila * TAMANO_CUADRADO + TAMANO_CUADRADO / 2)), RADIO_CIRCULO)
                 
     pygame.display.update()      
@@ -104,14 +110,94 @@ def dibujarTablero(tablero):
 def mostrarGanador(ficha):
     # Volver a pintar rectangulo negro antes de mostrar mensaje
     pygame.draw.rect(pantalla, NEGRO, (0, 0, ANCHO_TABLERO, TAMANO_CUADRADO)) 
-    if ficha == 1: 
+    if ficha == FICHA_JUGADOR: 
         font = pygame.font.SysFont("monospace", 50)
         label = font.render("¡Gana el Jugador!", 1, COLOR_JUGADOR)
         pantalla.blit(label, (100, 25))
-    elif ficha == 2:
+    elif ficha == FICHA_PC:
         font = pygame.font.SysFont("monospace", 50)
         label = font.render("Gana la PC", 1, COLOR_PC)
         pantalla.blit(label, (195, 25))
+
+# Inteligencia Artificial
+
+def evaluarVentana(ventana, ficha):
+    puntuacion = 0
+
+    # Alternar turno
+    fichaContraria = FICHA_PC if ficha == FICHA_JUGADOR else FICHA_JUGADOR
+
+    # Gana juego
+    if ventana.count(ficha) == CONECTA_FICHAS:
+        puntuacion += 100
+    # Conecta 2
+    elif ventana.count(ficha) == (CONECTA_FICHAS - 1) and ventana.count(FICHA_VACIA) == 1:
+        puntuacion += 10
+    # Fichas contrincante
+    if ventana.count(fichaContraria) == (CONECTA_FICHAS - 1) and ventana.count(FICHA_VACIA) == 1:
+        puntuacion -= 80
+
+    return puntuacion
+
+def calcularPuntuacionDePosicion(tablero, ficha):
+    puntuacion = 0
+
+    # Puntuacion columna central
+    arregloCentral = [int(i) for i in list(tablero[:, COLUMNAS // 2])]
+    contadorCentral = arregloCentral.count(ficha)
+    puntuacion += contadorCentral * 6
+
+    # Puntuacion horizontal
+    for fila in range(FILAS):
+        arregloFilas = [int(i) for i in list(tablero[fila, :])]
+        for columna in range(COLUMNAS - 2):
+            ventana = arregloFilas[columna:columna + LONGITUD_VENTANA]
+            puntuacion += evaluarVentana(ventana, ficha)
+
+    # Puntuacion vertical
+    for columna in range(COLUMNAS):
+        arregloColumnas = [int(i) for i in list(tablero[:, columna])]
+        for fila in range(FILAS - 2):
+            ventana = arregloColumnas[fila:fila + LONGITUD_VENTANA]
+            puntuacion += evaluarVentana(ventana, ficha)
+
+    # Checar diagonales
+    for fila in range(FILAS - 2):
+        for columna in range(COLUMNAS - 2):
+            ventana = [tablero[fila + i][columna + i] for i in range(LONGITUD_VENTANA)]
+            puntuacion += evaluarVentana(ventana, ficha)
+
+    for fila in range(FILAS - 2):
+        for columna in range(COLUMNAS - 2):
+            ventana = [tablero[fila + 2 - i][columna + i] for i in range(LONGITUD_VENTANA)]
+            puntuacion += evaluarVentana(ventana, ficha)
+
+    return puntuacion
+
+def obtenerPosicionValidas(tablero):
+    posicionesValidas = []
+    for columna in range(COLUMNAS):
+        if esPosicionValida(tablero, columna):
+            posicionesValidas.append(columna)
+    return posicionesValidas
+
+
+def elegirMejorMovimiento(tablero, ficha):
+    posicionesValidas = obtenerPosicionValidas(tablero)
+    mejorPuntuacion = -10000
+    mejorColumna = random.choice(posicionesValidas)
+    for columna in posicionesValidas:
+        fila = obtenerSiguienteFila(tablero, ficha)
+        tableroTemporal = tablero.copy()
+        ponerFicha(tableroTemporal, fila, columna, ficha)
+        puntuacion = calcularPuntuacionDePosicion(tableroTemporal, ficha)
+
+        # Comparar puntuaciones
+        if puntuacion > mejorPuntuacion: 
+            mejorPuntuacion = puntuacion
+            mejorColumna = columna
+
+    return mejorColumna
 
 
 # Jugar
@@ -135,18 +221,18 @@ def jugarJuego():
 
             # Click
             if event.type == pygame.MOUSEBUTTONDOWN:
-                # Turno del Jugador (1)
+                # Turno del Jugador
                 if turno == JUGADOR:
                     pos_x = event.pos[0]
                     columna = int(math.floor(pos_x / TAMANO_CUADRADO))
                     
                     if esPosicionValida(tablero, columna):
                         fila = obtenerSiguienteFila(tablero, columna)
-                        ponerFicha(tablero, fila, columna, 1) 
+                        ponerFicha(tablero, fila, columna, FICHA_JUGADOR) 
 
-                        if movimientoGanador(tablero, 1):
+                        if movimientoGanador(tablero, FICHA_JUGADOR):
                             print("¡Gana el Jugador!")
-                            mostrarGanador(1)
+                            mostrarGanador(FICHA_JUGADOR)
                             gameOver = True
 
                          # Continuar juego
@@ -154,18 +240,19 @@ def jugarJuego():
                         imprimirTablero(tablero)
                         dibujarTablero(tablero)
 
-        # Turno de la PC (2)
+        # Turno de la PC
         if turno == PC and not gameOver:
-            columna = random.randint(0, COLUMNAS - 1)
+            # columna = random.randint(0, COLUMNAS - 1)
+            columna = elegirMejorMovimiento(tablero, FICHA_PC)
             
             if esPosicionValida(tablero, columna):
                 pygame.time.wait(500)
                 fila = obtenerSiguienteFila(tablero, columna)
-                ponerFicha(tablero, fila, columna, 2) 
+                ponerFicha(tablero, fila, columna, FICHA_PC) 
 
-                if movimientoGanador(tablero, 2):
+                if movimientoGanador(tablero, FICHA_PC):
                     print("Gana la PC")
-                    mostrarGanador(2)
+                    mostrarGanador(FICHA_PC)
                     gameOver = True
 
                 # Continuar juego
