@@ -1,4 +1,5 @@
 import numpy as np
+import random
 import pygame
 import sys
 import math
@@ -8,6 +9,8 @@ FILAS = 6
 COLUMNAS = 7
 #FILAS = 3
 #COLUMNAS = 3
+JUGADOR = 0
+PC = 1
 
 # Configuracion graficos
 TAMANO_CUADRADO = 100
@@ -27,9 +30,7 @@ AMARILLO = (255, 255, 0)
 COLOR_JUGADOR = ROJO
 COLOR_PC = AMARILLO
 
-
-
-
+# Funciones auxiliares
 def crearTablero():
     tablero = np.zeros((FILAS, COLUMNAS))
     return tablero
@@ -75,6 +76,9 @@ def movimientoGanador(tablero, ficha):
             if tablero[fila][columna] == ficha and tablero[fila - 1][columna + 1] == ficha and tablero[fila - 2][columna + 2] == ficha:
                 return True
 
+def primerTurno():
+    return random.randint(JUGADOR, PC)
+
 # Graficos
 def dibujarTablero(tablero):
     for columna in range(COLUMNAS):
@@ -94,6 +98,7 @@ def dibujarTablero(tablero):
             elif pos == 2:
                 # Fichas PC
                 pygame.draw.circle(pantalla, COLOR_PC, (int(columna * TAMANO_CUADRADO + TAMANO_CUADRADO / 2), ALTURA_TABLERO - int(fila * TAMANO_CUADRADO + TAMANO_CUADRADO / 2)), RADIO_CIRCULO)
+                
     pygame.display.update()      
 
 def mostrarGanador(ficha):
@@ -108,10 +113,11 @@ def mostrarGanador(ficha):
         label = font.render("Gana la PC", 1, COLOR_PC)
         pantalla.blit(label, (195, 25))
 
+
 # Jugar
 def jugarJuego():
     gameOver = False
-    turno = 0
+    turno = primerTurno()
 
     while not gameOver:
         for event in pygame.event.get():
@@ -123,18 +129,17 @@ def jugarJuego():
                 # Volver a pintar rectangulo negro antes de pintar la ficha actual
                 pygame.draw.rect(pantalla, NEGRO, (0, 0, ANCHO_TABLERO, TAMANO_CUADRADO)) 
                 pos_x = event.pos[0]
-                if turno % 2 == 0:
+                if turno == JUGADOR:
                     pygame.draw.circle(pantalla, COLOR_JUGADOR, (pos_x, int(TAMANO_CUADRADO / 2)), RADIO_CIRCULO)
-                else:
-                    pygame.draw.circle(pantalla, COLOR_PC, (pos_x, int(TAMANO_CUADRADO / 2)), RADIO_CIRCULO)
             pygame.display.update()
 
             # Click
             if event.type == pygame.MOUSEBUTTONDOWN:
                 # Turno del Jugador (1)
-                if turno % 2 == 0:
+                if turno == JUGADOR:
                     pos_x = event.pos[0]
                     columna = int(math.floor(pos_x / TAMANO_CUADRADO))
+                    
                     if esPosicionValida(tablero, columna):
                         fila = obtenerSiguienteFila(tablero, columna)
                         ponerFicha(tablero, fila, columna, 1) 
@@ -144,27 +149,33 @@ def jugarJuego():
                             mostrarGanador(1)
                             gameOver = True
 
-                # Turno de la PC (2)
-                else:
-                    pos_x = event.pos[0]
-                    columna = int(math.floor(pos_x / TAMANO_CUADRADO))
-                    if esPosicionValida(tablero, columna):
-                        fila = obtenerSiguienteFila(tablero, columna)
-                        ponerFicha(tablero, fila, columna, 2) 
+                         # Continuar juego
+                        turno = (turno + 1) % 2
+                        imprimirTablero(tablero)
+                        dibujarTablero(tablero)
 
-                        if movimientoGanador(tablero, 2):
-                            print("Gana la PC")
-                            mostrarGanador(2)
-                            gameOver = True
+        # Turno de la PC (2)
+        if turno == PC and not gameOver:
+            columna = random.randint(0, COLUMNAS - 1)
+            
+            if esPosicionValida(tablero, columna):
+                pygame.time.wait(500)
+                fila = obtenerSiguienteFila(tablero, columna)
+                ponerFicha(tablero, fila, columna, 2) 
+
+                if movimientoGanador(tablero, 2):
+                    print("Gana la PC")
+                    mostrarGanador(2)
+                    gameOver = True
 
                 # Continuar juego
-                turno += 1
+                turno = (turno + 1) % 2
                 imprimirTablero(tablero)
                 dibujarTablero(tablero)
 
-                # Se termina el juego
-                if gameOver:
-                    pygame.time.wait(3000)
+        # Se termina el juego
+        if gameOver:
+            pygame.time.wait(3000)
 
 
 
